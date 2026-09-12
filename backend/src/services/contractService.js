@@ -224,6 +224,20 @@ async function importContractsToDatabase(options = {}) {
   let batchNum = 0;
 
   try {
+    // Ensure table and indexes exist before importing
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS contracts (
+        token BIGINT PRIMARY KEY,
+        instrument_type VARCHAR(20) NOT NULL,
+        symbol VARCHAR(50) NOT NULL,
+        expiry_date BIGINT,
+        contract_name VARCHAR(100) NOT NULL,
+        exchange VARCHAR(10) NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_contracts_symbol_type ON contracts(symbol, instrument_type);
+      CREATE INDEX IF NOT EXISTS idx_contracts_expiry ON contracts(expiry_date);
+    `);
+
     await client.query('BEGIN');
 
     if (options.clearExisting) {
@@ -307,6 +321,27 @@ async function getContractsSummary(customPool = pool) {
   };
 }
 
+/**
+ * Ensures that the 'contracts' table and its indexes exist in PostgreSQL.
+ * 
+ * @param {object} customPool - Optional custom pool instance
+ */
+async function ensureContractsTable(customPool = pool) {
+  const queryText = `
+    CREATE TABLE IF NOT EXISTS contracts (
+      token BIGINT PRIMARY KEY,
+      instrument_type VARCHAR(20) NOT NULL,
+      symbol VARCHAR(50) NOT NULL,
+      expiry_date BIGINT,
+      contract_name VARCHAR(100) NOT NULL,
+      exchange VARCHAR(10) NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_contracts_symbol_type ON contracts(symbol, instrument_type);
+    CREATE INDEX IF NOT EXISTS idx_contracts_expiry ON contracts(expiry_date);
+  `;
+  await customPool.query(queryText);
+}
+
 module.exports = {
   parseCmEquityContract,
   parseFoFutstkContract,
@@ -316,4 +351,5 @@ module.exports = {
   insertContractBatch,
   importContractsToDatabase,
   getContractsSummary,
+  ensureContractsTable,
 };

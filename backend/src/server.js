@@ -7,7 +7,7 @@ const {
   getConnectedClientCount,
   closeWebSocketServer,
 } = require('./websocket/socketServer');
-const { getContractsSummary } = require('./services/contractService');
+const { getContractsSummary, ensureContractsTable } = require('./services/contractService');
 const { MarketPairEngine, streamAndBroadcastMarketData } = require('./services/marketDataService');
 
 // Global Market Engine instance
@@ -92,6 +92,9 @@ async function startServer() {
       console.log(`🗄️  [PostgreSQL] Connected successfully to database "${dbRes.rows[0].db}" (Time: ${dbRes.rows[0].now})`);
 
       try {
+        // Ensure contracts table schema exists
+        await ensureContractsTable(pool);
+
         const countRes = await client.query('SELECT COUNT(*) AS total FROM contracts;');
         console.log(`📋 [PostgreSQL] "contracts" table verified: ${countRes.rows[0].total} records found.`);
 
@@ -105,8 +108,8 @@ async function startServer() {
     }
   } catch (dbErr) {
     console.warn(`⚠️  [PostgreSQL] Connection status: Offline / Auth Required (${dbErr.message})`);
-    if (!process.env.DB_PASSWORD) {
-      console.warn('👉 [PostgreSQL] Hint: Set DB_PASSWORD in backend/.env to connect to your local PostgreSQL.');
+    if (!process.env.DATABASE_URL && !process.env.DB_PASSWORD) {
+      console.warn('👉 [PostgreSQL] Hint: Set DATABASE_URL or DB_PASSWORD in backend/.env.');
     }
   }
 
