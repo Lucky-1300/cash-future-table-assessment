@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5000';
+const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || (
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? 'wss://cash-future-table-assessment.onrender.com'
+    : 'ws://localhost:5000'
+);
 const RECONNECT_DELAY_MS = 3000;
 const FLUSH_INTERVAL_MS = 100; // Batch updates to 10fps for smooth 60fps UI rendering
 const PING_INTERVAL_MS = 3000; // Ping server every 3s for precise latency tracking

@@ -2,8 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables from backend/.env
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Load environment variables from backend/.env or root .env
+const backendEnvPath = path.resolve(__dirname, '../../.env');
+const rootEnvPath = path.resolve(__dirname, '../../../.env');
+
+if (fs.existsSync(backendEnvPath)) {
+  dotenv.config({ path: backendEnvPath });
+}
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath });
+}
+dotenv.config();
 
 let rawDatabaseUrl = process.env.DATABASE_URL ? process.env.DATABASE_URL.trim() : undefined;
 if (rawDatabaseUrl) {
@@ -35,21 +44,23 @@ const isCloudDb = !!(rawDatabaseUrl && (
 function resolveCsvPath(envVarName, defaultFileName) {
   const envVal = process.env[envVarName];
   if (envVal && envVal.trim()) {
-    const trimmed = envVal.trim();
-    if (fs.existsSync(trimmed)) return trimmed;
-    const resolved = path.resolve(trimmed);
+    const cleanVal = envVal.trim().replace(/^["']|["']$/g, '');
+    if (fs.existsSync(cleanVal)) return cleanVal;
+    const normalized = path.normalize(cleanVal);
+    if (fs.existsSync(normalized)) return normalized;
+    const resolved = path.resolve(cleanVal);
     if (fs.existsSync(resolved)) return resolved;
-    return trimmed;
+    return cleanVal;
   }
 
   // Search standard candidate relative paths
   const candidates = [
+    path.resolve(process.cwd(), 'data', defaultFileName),
+    path.resolve(process.cwd(), defaultFileName),
     path.resolve(__dirname, '../../data', defaultFileName),
     path.resolve(__dirname, '../../../data', defaultFileName),
     path.resolve(__dirname, '../..', defaultFileName),
     path.resolve(__dirname, '../../..', defaultFileName),
-    path.resolve(process.cwd(), 'data', defaultFileName),
-    path.resolve(process.cwd(), defaultFileName),
   ];
 
   for (const candidate of candidates) {
