@@ -110,9 +110,9 @@ async function startServer() {
     }
   }
 
-  // 3. Start Native HTTP Listener
-  server.listen(PORT, () => {
-    console.log(`🚀 [HTTP Server] Listening on http://localhost:${PORT}`);
+  // 3. Start Native HTTP Listener (Bind to 0.0.0.0 for cloud environments)
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 [HTTP Server] Listening on http://0.0.0.0:${PORT}`);
     console.log('====================================================');
     console.log('   Backend ready! Awaiting client connections...   ');
     console.log('====================================================\n');
