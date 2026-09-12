@@ -88,6 +88,36 @@ const SpreadCellRenderer = (params) => {
   );
 };
 
+// Custom renderer for Buy Spread (Future Bid - Stock Ask)
+const BuySpreadCellRenderer = (params) => {
+  const spread = params.value;
+  if (spread === undefined || spread === null || spread === '') return '-';
+  const num = Number(spread);
+  if (isNaN(num)) return '-';
+  const isPositive = num >= 0;
+
+  return (
+    <div className={`spread-pill ${isPositive ? 'positive' : 'negative'}`}>
+      <span>{isPositive ? '+' : ''}₹{num.toFixed(2)}</span>
+    </div>
+  );
+};
+
+// Custom renderer for Sell Spread (Stock Bid - Future Ask)
+const SellSpreadCellRenderer = (params) => {
+  const spread = params.value;
+  if (spread === undefined || spread === null || spread === '') return '-';
+  const num = Number(spread);
+  if (isNaN(num)) return '-';
+  const isPositive = num >= 0;
+
+  return (
+    <div className={`spread-pill ${isPositive ? 'positive' : 'negative'}`}>
+      <span>{isPositive ? '+' : ''}₹{num.toFixed(2)}</span>
+    </div>
+  );
+};
+
 // Custom renderer for the Spread % badge (2 decimal places)
 const SpreadPercentRenderer = (params) => {
   const pct = params.value;
@@ -188,8 +218,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'cashContractName',
           headerName: 'CONTRACT',
-          width: 150,
-          minWidth: 135,
+          width: 140,
+          minWidth: 125,
           filter: 'agTextColumnFilter',
           cellClass: 'contract-cell-cash',
           headerClass: 'col-header-cash',
@@ -197,8 +227,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'cashToken',
           headerName: 'TOKEN',
-          width: 95,
-          minWidth: 85,
+          width: 90,
+          minWidth: 80,
           filter: 'agNumberColumnFilter',
           cellClass: 'token-cell text-mono',
           headerClass: 'col-header-cash',
@@ -206,8 +236,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'cashBid',
           headerName: 'CASH BID',
-          width: 125,
-          minWidth: 110,
+          width: 120,
+          minWidth: 105,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'text-mono price-bid',
@@ -217,8 +247,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'cashAsk',
           headerName: 'CASH ASK',
-          width: 125,
-          minWidth: 110,
+          width: 120,
+          minWidth: 105,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'text-mono price-ask',
@@ -227,9 +257,9 @@ export const MarketDataTable = forwardRef(({
         },
         {
           field: 'cashLtp',
-          headerName: 'CASH LTP',
-          width: 135,
-          minWidth: 120,
+          headerName: 'STOCK LTP',
+          width: 130,
+          minWidth: 115,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'price-ltp cash-ltp text-mono',
@@ -246,8 +276,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'futureContractName',
           headerName: 'CONTRACT',
-          width: 195,
-          minWidth: 170,
+          width: 185,
+          minWidth: 160,
           filter: 'agTextColumnFilter',
           cellClass: 'contract-cell-future',
           headerClass: 'col-header-future',
@@ -255,8 +285,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'futureToken',
           headerName: 'TOKEN',
-          width: 95,
-          minWidth: 85,
+          width: 90,
+          minWidth: 80,
           filter: 'agNumberColumnFilter',
           cellClass: 'token-cell text-mono',
           headerClass: 'col-header-future',
@@ -264,8 +294,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'futureExpiry',
           headerName: 'EXPIRY',
-          width: 130,
-          minWidth: 115,
+          width: 120,
+          minWidth: 105,
           valueFormatter: formatExpiryDate,
           cellClass: 'expiry-cell',
           headerClass: 'col-header-future',
@@ -273,8 +303,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'futureBid',
           headerName: 'FUT BID',
-          width: 125,
-          minWidth: 110,
+          width: 120,
+          minWidth: 105,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'text-mono price-bid',
@@ -284,8 +314,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'futureAsk',
           headerName: 'FUT ASK',
-          width: 125,
-          minWidth: 110,
+          width: 120,
+          minWidth: 105,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'text-mono price-ask',
@@ -294,9 +324,9 @@ export const MarketDataTable = forwardRef(({
         },
         {
           field: 'futureLtp',
-          headerName: 'FUT LTP',
-          width: 135,
-          minWidth: 120,
+          headerName: 'FUTURE LTP',
+          width: 130,
+          minWidth: 115,
           valueFormatter: formatPrice,
           type: 'numericColumn',
           cellClass: 'price-ltp future-ltp text-mono',
@@ -306,15 +336,35 @@ export const MarketDataTable = forwardRef(({
       ],
     },
     {
-      headerName: 'ARBITRAGE & ANALYTICS',
+      headerName: 'SPREADS & ARBITRAGE',
       marryChildren: true,
       headerClass: 'group-header-analytics',
       children: [
         {
+          field: 'buySpread',
+          headerName: 'BUY SPREAD',
+          width: 135,
+          minWidth: 120,
+          type: 'numericColumn',
+          cellRenderer: BuySpreadCellRenderer,
+          headerClass: 'col-header-analytics',
+          enableCellChangeFlash: true,
+        },
+        {
+          field: 'sellSpread',
+          headerName: 'SELL SPREAD',
+          width: 135,
+          minWidth: 120,
+          type: 'numericColumn',
+          cellRenderer: SellSpreadCellRenderer,
+          headerClass: 'col-header-analytics',
+          enableCellChangeFlash: true,
+        },
+        {
           field: 'spread',
           headerName: 'BASIS SPREAD',
-          width: 140,
-          minWidth: 125,
+          width: 135,
+          minWidth: 120,
           type: 'numericColumn',
           cellRenderer: SpreadCellRenderer,
           headerClass: 'col-header-analytics',
@@ -324,8 +374,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'spreadPercent',
           headerName: 'SPREAD %',
-          width: 115,
-          minWidth: 100,
+          width: 110,
+          minWidth: 95,
           type: 'numericColumn',
           cellRenderer: SpreadPercentRenderer,
           headerClass: 'col-header-analytics',
@@ -334,8 +384,8 @@ export const MarketDataTable = forwardRef(({
         {
           field: 'lastUpdated',
           headerName: 'UPDATED',
-          width: 115,
-          minWidth: 100,
+          width: 110,
+          minWidth: 95,
           cellClass: 'last-updated-cell text-small',
           headerClass: 'col-header-analytics',
         },

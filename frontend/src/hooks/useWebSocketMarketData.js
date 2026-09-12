@@ -93,9 +93,21 @@ export function useWebSocketMarketData(url = DEFAULT_WS_URL) {
       let spread = item.spread !== undefined ? item.spread : null;
       let spreadPercent = item.spreadPercent !== undefined ? item.spreadPercent : null;
 
-      if (futureLtp !== null && cashLtp !== null) {
+      if (futureLtp !== null && cashLtp !== null && cashLtp > 0) {
         spread = Number((futureLtp - cashLtp).toFixed(2));
-        spreadPercent = cashLtp > 0 ? Number(((spread / cashLtp) * 100).toFixed(2)) : 0;
+        spreadPercent = Number(((spread / cashLtp) * 100).toFixed(2));
+      }
+
+      // 1. Buy Spread = Future Bid - Stock Ask
+      let buySpread = item.buySpread !== undefined ? item.buySpread : null;
+      if (Number.isFinite(futureBid) && Number.isFinite(cashAsk) && cashAsk > 0) {
+        buySpread = Number((futureBid - cashAsk).toFixed(2));
+      }
+
+      // 2. Sell Spread = Stock Bid - Future Ask
+      let sellSpread = item.sellSpread !== undefined ? item.sellSpread : null;
+      if (Number.isFinite(cashBid) && Number.isFinite(futureAsk) && futureAsk > 0) {
+        sellSpread = Number((cashBid - futureAsk).toFixed(2));
       }
 
       const row = {
@@ -111,6 +123,8 @@ export function useWebSocketMarketData(url = DEFAULT_WS_URL) {
         futureLtp,
         futureBid,
         futureAsk,
+        buySpread,
+        sellSpread,
         spread,
         spreadPercent,
         lastUpdated: item.lastUpdated || new Date().toLocaleTimeString(),
@@ -152,15 +166,78 @@ export function useWebSocketMarketData(url = DEFAULT_WS_URL) {
       if (Number.isFinite(tick.ask)) row.futureAsk = tick.ask;
     }
 
-    // Recalculate Basis Spread (Future LTP - Cash LTP)
-    if (row.futureLtp !== null && row.cashLtp !== null) {
+    // 1. Buy Spread = Future Bid - Stock Ask
+    if (Number.isFinite(row.futureBid) && Number.isFinite(row.cashAsk) && row.cashAsk > 0) {
+      row.buySpread = Number((row.futureBid - row.cashAsk).toFixed(2));
+    } else {
+      row.buySpread = null;
+    }
+
+    // 2. Sell Spread = Stock Bid - Future Ask
+    if (Number.isFinite(row.cashBid) && Number.isFinite(row.futureAsk) && row.futureAsk > 0) {
+      row.sellSpread = Number((row.cashBid - row.futureAsk).toFixed(2));
+    } else {
+      row.sellSpread = null;
+    }
+
+    // 3. Basis Spread = Future LTP - Stock LTP
+    if (Number.isFinite(row.futureLtp) && Number.isFinite(row.cashLtp) && row.cashLtp > 0) {
       row.spread = Number((row.futureLtp - row.cashLtp).toFixed(2));
-      row.spreadPercent = row.cashLtp > 0 ? Number(((row.spread / row.cashLtp) * 100).toFixed(2)) : 0;
+      row.spreadPercent = Number(((row.spread / row.cashLtp) * 100).toFixed(2));
     }
 
     row.lastUpdated = new Date().toLocaleTimeString();
     hasPendingUpdatesRef.current = true;
   }, []);
+
+  // Applies either an updated Pair object or a single Tick object
+  const applyUpdateItem = useCallback((item) => {
+    if (!item) return;
+
+    if (item.symbol) {
+      const symbol = item.symbol.trim();
+      const existing = rowMapRef.current.get(symbol);
+      if (existing) {
+        if (item.cashLtp !== undefined && item.cashLtp !== null) existing.cashLtp = item.cashLtp;
+        if (item.cashBid !== undefined && item.cashBid !== null) existing.cashBid = item.cashBid;
+        if (item.cashAsk !== undefined && item.cashAsk !== null) existing.cashAsk = item.cashAsk;
+        if (item.futureLtp !== undefined && item.futureLtp !== null) existing.futureLtp = item.futureLtp;
+        if (item.futureBid !== undefined && item.futureBid !== null) existing.futureBid = item.futureBid;
+        if (item.futureAsk !== undefined && item.futureAsk !== null) existing.futureAsk = item.futureAsk;
+
+        // 1. Buy Spread = Future Bid - Stock Ask
+        if (Number.isFinite(existing.futureBid) && Number.isFinite(existing.cashAsk) && existing.cashAsk > 0) {
+          existing.buySpread = Number((existing.futureBid - existing.cashAsk).toFixed(2));
+        } else if (item.buySpread !== undefined) {
+          existing.buySpread = item.buySpread;
+        }
+
+        // 2. Sell Spread = Stock Bid - Future Ask
+        if (Number.isFinite(existing.cashBid) && Number.isFinite(existing.futureAsk) && existing.futureAsk > 0) {
+          existing.sellSpread = Number((existing.cashBid - existing.futureAsk).toFixed(2));
+        } else if (item.sellSpread !== undefined) {
+          existing.sellSpread = item.sellSpread;
+        }
+
+        // 3. Basis Spread = Future LTP - Stock LTP
+        if (Number.isFinite(existing.futureLtp) && Number.isFinite(existing.cashLtp) && existing.cashLtp > 0) {
+          existing.spread = Number((existing.futureLtp - existing.cashLtp).toFixed(2));
+          existing.spreadPercent = Number(((existing.spread / existing.cashLtp) * 100).toFixed(2));
+        } else if (item.spread !== undefined) {
+          existing.spread = item.spread;
+          existing.spreadPercent = item.spreadPercent;
+        }
+
+        existing.lastUpdated = item.lastUpdated || new Date().toLocaleTimeString();
+        hasPendingUpdatesRef.current = true;
+      }
+      return;
+    }
+
+    if (item.token) {
+      applySingleTick(item);
+    }
+  }, [applySingleTick]);
 
   // Main native WebSocket connection handler
   const connect = useCallback(() => {
@@ -220,19 +297,19 @@ export function useWebSocketMarketData(url = DEFAULT_WS_URL) {
         else if (message.type === 'INITIAL_SNAPSHOT' && Array.isArray(message.data)) {
           applySnapshot(message.data);
         }
-        // 4. Batch Market Ticks
+        // 4. Batch Market Updates (1-second intervals from backend)
         else if (message.type === 'MARKET_BATCH' && Array.isArray(message.data)) {
           tickCountRef.current += message.data.length;
           setTickCount(tickCountRef.current);
           for (let i = 0; i < message.data.length; i++) {
-            applySingleTick(message.data[i]);
+            applyUpdateItem(message.data[i]);
           }
         }
-        // 5. Single Market Tick
+        // 5. Single Market Update
         else if (message.type === 'MARKET_TICK' && message.data) {
           tickCountRef.current += 1;
           setTickCount(tickCountRef.current);
-          applySingleTick(message.data);
+          applyUpdateItem(message.data);
         }
       };
 

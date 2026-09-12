@@ -176,6 +176,20 @@ export const MarketDetailDrawer = ({
               </div>
               <div className="drawer-analytics-grid">
                 <div className="analytics-card">
+                  <span className="analytics-label">BUY SPREAD</span>
+                  <span className={`analytics-val text-mono ${(pair.buySpread || 0) >= 0 ? 'text-green' : 'text-red'}`}>
+                    {(pair.buySpread || 0) >= 0 ? '+' : ''}{formatPrice(pair.buySpread)}
+                  </span>
+                  <span className="analytics-sub">Future Bid - Stock Ask</span>
+                </div>
+                <div className="analytics-card">
+                  <span className="analytics-label">SELL SPREAD</span>
+                  <span className={`analytics-val text-mono ${(pair.sellSpread || 0) >= 0 ? 'text-green' : 'text-red'}`}>
+                    {(pair.sellSpread || 0) >= 0 ? '+' : ''}{formatPrice(pair.sellSpread)}
+                  </span>
+                  <span className="analytics-sub">Stock Bid - Future Ask</span>
+                </div>
+                <div className="analytics-card">
                   <span className="analytics-label">BASIS SPREAD</span>
                   <span className={`analytics-val text-mono ${isPositive ? 'text-green' : 'text-red'}`}>
                     {isPositive ? '+' : ''}{formatPrice(pair.spread)}

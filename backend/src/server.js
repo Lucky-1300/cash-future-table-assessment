@@ -121,7 +121,7 @@ async function startServer() {
     if (marketEngine.isInitialized) {
       setImmediate(() => {
         streamAndBroadcastMarketData(marketEngine, {
-          batchSize: 50,
+          publishIntervalMs: 1000,
           onProgress: (seg, count, stats) => {
             if (count % 250000 === 0) {
               console.log(`📡 [LiveStream] ${seg} streamed ${count.toLocaleString()} ticks (${stats.updatedPairs}/${stats.totalPairs} pairs live)`);
