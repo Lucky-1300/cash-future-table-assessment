@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const config = require('../config/env');
 const {
   streamCmMarketData,
   streamFoMarketData,
@@ -343,6 +346,27 @@ async function streamAndBroadcastMarketData(engine, options = {}) {
     onProgress,
   } = options;
 
+  const resolvedCmPath = cmFilePath || config.csv.cmMarketDataPath;
+  const resolvedFoPath = foFilePath || config.csv.foMarketDataPath;
+
+  const hasCm = fs.existsSync(resolvedCmPath);
+  const hasFo = fs.existsSync(resolvedFoPath);
+
+  if (!hasCm && !hasFo) {
+    console.log(`ℹ️  [LiveStream] Market-data CSV files not present at deployment paths:`);
+    console.log(`   - CM Path: ${resolvedCmPath}`);
+    console.log(`   - FO Path: ${resolvedFoPath}`);
+    console.log(`   💡 WebSocket server is active and serving all ${engine.getAllPairs().length} PostgreSQL contract pairs.`);
+    return {
+      totalPairs: engine.getAllPairs().length,
+      updatedPairs: 0,
+      cmProcessed: 0,
+      foProcessed: 0,
+      broadcastCount: 0,
+      durationMs: 0,
+    };
+  }
+
   const startTime = Date.now();
   let broadcastCount = 0;
   let cycle = 0;
@@ -368,41 +392,45 @@ async function streamAndBroadcastMarketData(engine, options = {}) {
     while (engine.isStreaming) {
       cycle++;
 
-      // 1. Stream CM Market Data (NSECM)
-      console.log(`   🌊 [Cycle ${cycle}] Streaming CM Market Data (nsecm_market_data.csv)...`);
-      await streamCmMarketData(async (rawRow, count) => {
-        if (!engine.isStreaming) return false;
-        engine.processTick(rawRow, 'NSECM');
+      // 1. Stream CM Market Data (NSECM) if available
+      if (hasCm) {
+        console.log(`   🌊 [Cycle ${cycle}] Streaming CM Market Data (${path.basename(resolvedCmPath)})...`);
+        await streamCmMarketData(async (rawRow, count) => {
+          if (!engine.isStreaming) return false;
+          engine.processTick(rawRow, 'NSECM');
 
-        // Pacing yield to prevent CPU starvations and allow 1-second timer to fire smoothly
-        if (count % 1000 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
+          // Pacing yield to prevent CPU starvation and allow 1-second timer to fire smoothly
+          if (count % 1000 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
 
-        if (count % 250000 === 0 && typeof onProgress === 'function') {
-          onProgress('CM', count, engine.getStats());
-        }
-      }, { limit: cmLimit, filePath: cmFilePath });
+          if (count % 250000 === 0 && typeof onProgress === 'function') {
+            onProgress('CM', count, engine.getStats());
+          }
+        }, { limit: cmLimit, filePath: resolvedCmPath });
 
-      console.log(`   ✅ [Cycle ${cycle}] CM Market Data stream cycle complete (${engine.metrics.cmProcessed.toLocaleString()} rows processed).`);
+        console.log(`   ✅ [Cycle ${cycle}] CM Market Data stream cycle complete (${engine.metrics.cmProcessed.toLocaleString()} rows processed).`);
+      }
 
-      // 2. Stream FO Market Data (NSEFO)
-      console.log(`   🌊 [Cycle ${cycle}] Streaming FO Market Data (nsefo_market_data.csv)...`);
-      await streamFoMarketData(async (rawRow, count) => {
-        if (!engine.isStreaming) return false;
-        engine.processTick(rawRow, 'NSEFO');
+      // 2. Stream FO Market Data (NSEFO) if available
+      if (hasFo) {
+        console.log(`   🌊 [Cycle ${cycle}] Streaming FO Market Data (${path.basename(resolvedFoPath)})...`);
+        await streamFoMarketData(async (rawRow, count) => {
+          if (!engine.isStreaming) return false;
+          engine.processTick(rawRow, 'NSEFO');
 
-        // Pacing yield to prevent CPU starvations and allow 1-second timer to fire smoothly
-        if (count % 1000 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
+          // Pacing yield to prevent CPU starvation and allow 1-second timer to fire smoothly
+          if (count % 1000 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
 
-        if (count % 250000 === 0 && typeof onProgress === 'function') {
-          onProgress('FO', count, engine.getStats());
-        }
-      }, { limit: foLimit, filePath: foFilePath });
+          if (count % 250000 === 0 && typeof onProgress === 'function') {
+            onProgress('FO', count, engine.getStats());
+          }
+        }, { limit: foLimit, filePath: resolvedFoPath });
 
-      console.log(`   ✅ [Cycle ${cycle}] FO Market Data stream cycle complete (${engine.metrics.foProcessed.toLocaleString()} rows processed).`);
+        console.log(`   ✅ [Cycle ${cycle}] FO Market Data stream cycle complete (${engine.metrics.foProcessed.toLocaleString()} rows processed).`);
+      }
 
       if (!continuous) break;
     }

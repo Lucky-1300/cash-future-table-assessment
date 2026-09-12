@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -23,6 +24,42 @@ const isCloudDb = !!(rawDatabaseUrl && (
   rawDatabaseUrl.includes('sslmode=require')
 ));
 
+/**
+ * Resolves a CSV path across Windows, Linux, and cloud environments (e.g. Render).
+ * Prioritizes environment variables, then checks standard relative directories.
+ * 
+ * @param {string} envVarName - Name of the environment variable (e.g. CM_MARKET_DATA_PATH)
+ * @param {string} defaultFileName - Standard CSV file name
+ * @returns {string} - Resolved path
+ */
+function resolveCsvPath(envVarName, defaultFileName) {
+  const envVal = process.env[envVarName];
+  if (envVal && envVal.trim()) {
+    const trimmed = envVal.trim();
+    if (fs.existsSync(trimmed)) return trimmed;
+    const resolved = path.resolve(trimmed);
+    if (fs.existsSync(resolved)) return resolved;
+    return trimmed;
+  }
+
+  // Search standard candidate relative paths
+  const candidates = [
+    path.resolve(__dirname, '../../data', defaultFileName),
+    path.resolve(__dirname, '../../../data', defaultFileName),
+    path.resolve(__dirname, '../..', defaultFileName),
+    path.resolve(__dirname, '../../..', defaultFileName),
+    path.resolve(process.cwd(), 'data', defaultFileName),
+    path.resolve(process.cwd(), defaultFileName),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  // Safe fallback to project root relative path
+  return path.resolve(__dirname, '../../..', defaultFileName);
+}
+
 const config = {
   db: {
     connectionString: rawDatabaseUrl || undefined,
@@ -34,10 +71,10 @@ const config = {
     ssl: process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true' || isCloudDb,
   },
   csv: {
-    cmContractMasterPath: process.env.CM_CONTRACT_MASTER_PATH || path.resolve(__dirname, '../../../nse_cm_ref_contract_master.csv'),
-    foContractMasterPath: process.env.FO_CONTRACT_MASTER_PATH || path.resolve(__dirname, '../../../nse_fo_ref_contract_master.csv'),
-    cmMarketDataPath: process.env.CM_MARKET_DATA_PATH || path.resolve(__dirname, '../../../nsecm_market_data.csv'),
-    foMarketDataPath: process.env.FO_MARKET_DATA_PATH || path.resolve(__dirname, '../../../nsefo_market_data.csv'),
+    cmContractMasterPath: resolveCsvPath('CM_CONTRACT_MASTER_PATH', 'nse_cm_ref_contract_master.csv'),
+    foContractMasterPath: resolveCsvPath('FO_CONTRACT_MASTER_PATH', 'nse_fo_ref_contract_master.csv'),
+    cmMarketDataPath: resolveCsvPath('CM_MARKET_DATA_PATH', 'nsecm_market_data.csv'),
+    foMarketDataPath: resolveCsvPath('FO_MARKET_DATA_PATH', 'nsefo_market_data.csv'),
   },
   port: parseInt(process.env.PORT, 10) || 5000,
 };
